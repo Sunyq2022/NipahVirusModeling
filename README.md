@@ -7,8 +7,6 @@ This repository contains R scripts for modeling and evaluating the spatial distr
 
 │   ├── sasea_map.rds              # Processed South Asia and Southeast Asia map
 
-│   ├── ten_segment_line.rds       # Processed ten-segment line map
-
 │   ├── nipah_occurrences.rds      # Processed Nipah virus occurrence points
 
 │   ├── env_vars_processed.rds     # Processed environmental variables grid
