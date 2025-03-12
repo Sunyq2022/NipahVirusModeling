@@ -17,8 +17,6 @@ This repository contains R scripts for modeling and evaluating the spatial distr
 
 │   ├── bat_deng_chikv.rds         # Combined bat, Chikungunya, and Dengue data
 
-├── Outputs/                       # Output directory (not tracked)
-
 ├── model_and_visualize.R          # Script to model and generate prediction maps
 
 ├── evaluate_and_visualize.R       # Script for model evaluation and visualization
