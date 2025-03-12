@@ -12,7 +12,6 @@ registerDoParallel(cl)
 
 # Load preprocessed data ----------------------------------------------------------------
 sasea_map <- readRDS('Data/sasea_map.rds')
-ten_segment_line <- readRDS('Data/ten_segment_line.rds')
 nipah_occurrences <- readRDS('Data/nipah_occurrences.rds')
 env_vars <- readRDS('Data/env_vars_processed.rds')
 bat_pathogens_sasea <- readRDS('Data/bat_pathogens_sasea.rds')
@@ -183,7 +182,6 @@ run_model <- function(nipah_type) {
                          midpoint = 0.5, limits = c(0, 1), breaks = c(0, 0.25, 0.5, 0.75, 1), 
                          na.value = "#368BB1", name = str_wrap("Probability", width = 24)) +
     geom_sf(data = sasea_map, fill = 'transparent', colour = 'black', size = 0.5) +
-    geom_sf(data = ten_segment_line) +
     theme_bw() + 
     theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), 
           axis.ticks = element_blank(), axis.title = element_blank(), 
