@@ -1,5 +1,3 @@
-setwd('D:\\WPS\\699051479\\WPS云盘\\01历史数据备份\\南京疾控笔记本备份\\00011  技术路线\\01 尼帕病毒\\18 尼帕回复\\数据代码共享')
-
 # Ensure required packages are installed -------------------------------------------------------
 required_packages <- c("sf", "tidyverse", "dismo", "terra", "raster", "corrplot", 
                        "gbm", "pROC", "usdm", "doParallel", "ggspatial", "patchwork")
@@ -14,6 +12,7 @@ registerDoParallel(cl)
 
 # Load preprocessed data ----------------------------------------------------------------
 sasea_map <- readRDS('Data/sasea_map.rds')
+ten_segment_line <- readRDS('Data/ten_segment_line.rds')
 nipah_occurrences <- readRDS('Data/nipah_occurrences.rds')
 env_vars <- readRDS('Data/env_vars_processed.rds')
 bat_pathogens_sasea <- readRDS('Data/bat_pathogens_sasea.rds')
@@ -92,10 +91,11 @@ run_model <- function(nipah_type) {
   n_predictors <- length(predictor_indices)
   gbm_models <- list()
   auc_values <- matrix(nrow = 100, ncol = 1, dimnames = list(NULL, "CV_AUC"))
+  best_n_trees <- numeric(100)  # Store best number of trees for each iteration
   
   # Model training with 100 iterations
   for (i in 1:100) {
-    print(i)
+    print(paste("Iteration:", i))
     set.seed(123456 + i)
     test_indices <- sample(1:nrow(combined_data), nrow(combined_data) / 5)
     test_data <- as.data.frame(combined_data[test_indices, ])
@@ -105,30 +105,38 @@ run_model <- function(nipah_type) {
                                 family = "bernoulli", tree.complexity = 5, learning.rate = 0.005, 
                                 bag.fraction = 0.75, n.trees = 100, step.size = 50, n.folds = 10, 
                                 max.trees = 5000, silent = FALSE, plot.main = TRUE)
+    
+    # Use gbm.perf to find the optimal number of trees
+    best_n_trees[i] <- gbm.perf(gbm_models[[i]], method = "cv", plot.it = FALSE)
     auc_values[i, "CV_AUC"] <- gbm_models[[i]]$cv.statistics$discrimination.mean
     
+    # Training predictions with best number of trees
     tmp <- cbind(rep(i, nrow(training_data)), training_data[, c("index", 'OID_', "exist")], 
-                 predict.gbm(gbm_models[[i]], training_data, n.trees = gbm_models[[i]]$n.trees, type = "response")) %>% 
+                 predict.gbm(gbm_models[[i]], training_data, n.trees = best_n_trees[i], type = "response")) %>% 
       as.data.frame()
     colnames(tmp) <- c('round', "index", 'OID_', 'case', 'pred')
     if (is.null(training_predictions)) training_predictions <- tmp else training_predictions <- rbind(training_predictions, tmp)
     
+    # Test predictions with best number of trees
     tmp <- cbind(rep(i, nrow(test_data)), test_data[, c("index", 'OID_', "exist")], 
-                 predict.gbm(gbm_models[[i]], test_data, n.trees = gbm_models[[i]]$n.trees, type = "response")) %>% 
+                 predict.gbm(gbm_models[[i]], test_data, n.trees = best_n_trees[i], type = "response")) %>% 
       as.data.frame()
     colnames(tmp) <- c('round', "index", 'OID_', 'case', 'pred')
     if (is.null(test_predictions)) test_predictions <- tmp else test_predictions <- rbind(test_predictions, tmp)
     
+    # All predictions with best number of trees
     tmp <- cbind(rep(i, nrow(prediction_data)), prediction_data[, c("index", 'OID_', "exist")], 
-                 predict.gbm(gbm_models[[i]], prediction_data, n.trees = gbm_models[[i]]$n.trees, type = "response")) %>% 
+                 predict.gbm(gbm_models[[i]], prediction_data, n.trees = best_n_trees[i], type = "response")) %>% 
       as.data.frame()
     colnames(tmp) <- c('round', "index", 'OID_', 'case', 'pred')
     if (is.null(all_predictions)) all_predictions <- tmp else all_predictions <- rbind(all_predictions, tmp)
     
+    # Variable contributions
     tmp <- summary(gbm_models[[i]])
     colnames(tmp) <- c('var', paste0('rel.inf.', i))
     if (is.null(variable_contributions)) variable_contributions <- tmp else variable_contributions <- merge(variable_contributions, tmp, by = 'var', sort = FALSE)
     
+    # Response curves with best number of trees
     mean_train <- NULL
     response_curve_tmp <- NULL
     for (vi in predictor_indices) {
@@ -139,7 +147,7 @@ run_model <- function(nipah_type) {
       tmp <- mean_train[1:250, ]
       tmp[rsi] <- seq(from = min(as.data.frame(combined_data)[rsi]), to = max(as.data.frame(combined_data)[rsi]), length.out = 250)
       x_i <- tmp[rsi]
-      y_i <- predict.gbm(gbm_models[[i]], tmp, n.trees = gbm_models[[i]]$n.trees, type = "response")
+      y_i <- predict.gbm(gbm_models[[i]], tmp, n.trees = best_n_trees[i], type = "response")
       y_i <- scale(y_i, center = TRUE, scale = FALSE)
       tmp_pred <- cbind(x_i, y_i)
       names(tmp_pred) <- c(names(as.data.frame(combined_data))[rsi], paste0("y.", rsi))
@@ -161,6 +169,7 @@ run_model <- function(nipah_type) {
   write_rds(training_predictions, paste0(output_dir, '/', nipah_type, "_training_predictions.rds"))
   write_rds(test_predictions, paste0(output_dir, '/', nipah_type, "_test_predictions.rds"))
   write_rds(all_predictions, paste0(output_dir, '/', nipah_type, "_all_predictions.rds"))
+  write_rds(best_n_trees, paste0(output_dir, '/', nipah_type, "_best_n_trees.rds"))  # Save best number of trees
   
   # Calculate average predictions for map
   avg_all_predictions <- aggregate(cbind(pred) ~ OID_, data = all_predictions, mean)
@@ -174,6 +183,7 @@ run_model <- function(nipah_type) {
                          midpoint = 0.5, limits = c(0, 1), breaks = c(0, 0.25, 0.5, 0.75, 1), 
                          na.value = "#368BB1", name = str_wrap("Probability", width = 24)) +
     geom_sf(data = sasea_map, fill = 'transparent', colour = 'black', size = 0.5) +
+    geom_sf(data = ten_segment_line) +
     theme_bw() + 
     theme(panel.grid = element_blank(), panel.background = element_rect(fill = "white"), 
           axis.ticks = element_blank(), axis.title = element_blank(), 
