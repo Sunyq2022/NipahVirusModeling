@@ -102,11 +102,11 @@ run_model <- function(nipah_type) {
     
     gbm_models[[i]] <- gbm.step(data = training_data, gbm.x = predictor_indices, gbm.y = response_index, 
                                 family = "bernoulli", tree.complexity = 5, learning.rate = 0.005, 
-                                bag.fraction = 0.75, n.trees = 100, step.size = 50, n.folds = 10, 
+                                bag.fraction = 0.75, n.trees = 100, step.size = 50, cv.folds = 10, 
                                 max.trees = 5000, silent = FALSE, plot.main = TRUE)
     
     # Use gbm.perf to find the optimal number of trees
-    best_n_trees[i] <- gbm.perf(gbm_models[[i]], method = "cv", plot.it = FALSE)
+    best_n_trees[i] <- gbm.perf(gbm_models[[i]], plot.it = FALSE)
     auc_values[i, "CV_AUC"] <- gbm_models[[i]]$cv.statistics$discrimination.mean
     
     # Training predictions with best number of trees
