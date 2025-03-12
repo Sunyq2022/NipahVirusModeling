@@ -1,6 +1,6 @@
 # Nipah Virus Spatial Modeling and Visualization
 
-This repository contains R scripts for modeling and evaluating the spatial distribution of Nipah virus outbreaks.
+This repository contains R scripts for modeling and evaluating the spatial distribution of Nipah virus outbreaks using Boosted Regression Trees (BRT).
 
 ## Repository Structure
 ├── Data/
