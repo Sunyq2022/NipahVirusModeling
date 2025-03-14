@@ -19,6 +19,4 @@ This repository contains R scripts for modeling and evaluating the spatial distr
 
 ├── model_and_visualize.R          # Script to model and generate prediction maps
 
-├── evaluate_and_visualize.R       # Script for model evaluation and visualization
-
 └── README.md                      # This documentation
